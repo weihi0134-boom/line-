@@ -108,12 +108,13 @@ function renderModal() {
       ${joined
         ? `<button class="green-btn leave-btn" id="joinBtn">取消報名</button>`
         : `<button class="green-btn" id="joinBtn" ${full ? 'disabled' : ''}>${full ? '揪團已滿' : '參加活動'}</button>`}
+      ${me && me === ev.host ? `<button class="cancel-event-btn" id="cancelEventBtn">取消揪團（刪除此活動）</button>` : ''}
     </div>`;
   } else {
     const cs = commentsOf(ev);
     body = `<div class="m-body cmt-list">
       ${cs.map((c) => c.sys
-        ? `<div class="cmt"><div class="pic" style="background:#06c755">i</div><div class="cmt-body"><div class="cmt-sys">${esc(c.u)} ${esc(c.x)} · ${esc(c.t)}</div></div></div>`
+        ? `<div class="cmt"><div class="pic" style="background:#2b8296">i</div><div class="cmt-body"><div class="cmt-sys">${esc(c.u)} ${esc(c.x)} · ${esc(c.t)}</div></div></div>`
         : `<div class="cmt"><div class="pic">${esc(initial(c.u))}</div><div class="cmt-body"><div class="cmt-name">${esc(c.u)}<span class="cmt-time">${esc(c.t)}</span></div><div class="cmt-text">${esc(c.x)}</div></div></div>`
       ).join('')}
     </div>
@@ -144,6 +145,7 @@ document.addEventListener('click', (e) => {
   const tab = e.target.closest('.m-tab');
   if (tab) { curTab = tab.dataset.tab; renderModal(); return; }
   if (e.target.id === 'joinBtn') { toggleJoin(); return; }
+  if (e.target.id === 'cancelEventBtn') { cancelEvent(); return; }
   if (e.target.id === 'cmtSend') { sendComment(); return; }
   const act = e.target.closest('[data-act]');
   if (act) { doAct(act.dataset.act); return; }
@@ -184,6 +186,23 @@ async function toggleJoin() {
     localStore.set('signups', signups);
   }
   renderModal(); renderList();
+}
+async function cancelEvent() {
+  const ev = curEvent; if (!ev) return;
+  if (!me || me !== ev.host) { alert('只有主揪本人可以取消這個揪團'); return; }
+  if (!confirm(`確定要取消並刪除「${ev.title}」這個揪團嗎？此動作無法復原。`)) return;
+  if (useLiff) {
+    try { await api('/events', { action: 'cancel', eventId: ev.id }); }
+    catch (err) { alert('取消失敗：' + err.message); return; }
+    EVENTS = EVENTS.filter((e) => e.id !== ev.id);
+  } else {
+    EVENTS = EVENTS.filter((e) => e.id !== ev.id);
+    const locals = localStore.get('localEvents', []).filter((e) => e.id !== ev.id);
+    localStore.set('localEvents', locals);
+  }
+  closeModal();
+  renderList();
+  alert('揪團已取消');
 }
 function pushLocal(ev, text, sys) { (comments[ev.id] || (comments[ev.id] = [])).push({ u: me, t: nowHM(), x: text, sys: !!sys }); localStore.set('cmts', comments); }
 
