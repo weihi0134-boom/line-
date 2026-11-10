@@ -3,5 +3,5 @@
 // 方便你先部署看效果，再回來補上 LIFF_ID。
 window.APP_CONFIG = {
   LIFF_ID: '2012521827-YHTkGsQg',
-  API_BASE: '/api',     // Vercel 上無需修改
+  API_BASE: '/api',
 };
