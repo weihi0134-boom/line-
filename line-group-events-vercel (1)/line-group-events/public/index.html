@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>群組活動佈告欄 │ 揪團</title>
+<link rel="stylesheet" href="style.css">
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="app-title">群組活動佈告欄</span>
+      <span class="app-ver">v1.0</span>
+    </div>
+    <div class="topbar-right">
+      <span id="loginStatus" class="login-status">登入身份：未登入成員</span>
+      <button id="loginBtn" class="login-btn">點此登入</button>
+    </div>
+  </header>
+
+  <nav class="filters">
+    <div class="filter-row tools">
+      <button class="chip chip-tool" data-sort="date">排序 ▾</button>
+      <button class="chip chip-tool" data-view="checkin">打卡</button>
+      <button class="chip chip-tool" data-view="promo">宣傳</button>
+      <button class="chip chip-tool" data-view="calendar">日曆</button>
+    </div>
+    <div class="filter-row cats" id="catRow"></div>
+  </nav>
+
+  <main id="eventList" class="event-list"><div class="foot-note">載入中…</div></main>
+  <div class="foot-note">— 已顯示全部活動 —</div>
+</div>
+
+<!-- 新增活動浮動按鈕 -->
+<button id="fab" class="fab" title="新增活動">＋</button>
+
+<!-- 新增活動表單 -->
+<div id="addMask" class="modal-mask hidden">
+  <div class="modal" id="addModal"></div>
+</div>
+
+<div id="modalMask" class="modal-mask hidden"><div class="modal" id="modal"></div></div>
+
+<div id="loginMask" class="modal-mask hidden">
+  <div class="login-card">
+    <div class="login-logo">LINE</div>
+    <h3>登入</h3>
+    <p class="login-desc" id="loginDesc">登入後即可報名活動、留言互動。</p>
+    <input id="nameInput" class="name-input" placeholder="你的顯示名稱" maxlength="16">
+    <button id="doLoginBtn" class="green-btn">登入</button>
+    <button id="cancelLoginBtn" class="text-btn">取消</button>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

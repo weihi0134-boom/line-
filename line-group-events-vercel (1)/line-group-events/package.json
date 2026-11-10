@@ -1,0 +1,8 @@
+{
+  "name": "line-group-events",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "群組活動佈告欄 / 揪團平台（LINE LIFF），可直接部署至 Vercel",
+  "engines": { "node": ">=18" }
+}
