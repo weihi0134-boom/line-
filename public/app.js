@@ -57,7 +57,9 @@ function renderLogin() {
   $('#loginBtn').textContent = me ? '登出' : '點此登入';
 }
 function renderCats() {
-  $('#catRow').innerHTML = CATS.map((c) =>
+  const row = $('#catRow');
+  if (!row) return; // 分類篩選列已移除
+  row.innerHTML = CATS.map((c) =>
     `<button class="chip${activeCat === c.id ? ' active' : ''}" data-cat="${esc(c.id)}">${esc(c.name)}<span class="cnt">${c.n}</span></button>`
   ).join('');
 }
