@@ -237,10 +237,7 @@ async function shareEvent(ev) {
   lines.push('', '點進佈告欄報名 👇', location.origin + '/');
   const text = lines.join('\n');
 
-  // 在 LINE 內優先跳分享選單；否則顯示可複製的邀請文字
-  if (useLiff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker')) {
-    try { await liff.shareTargetPicker([{ type: 'text', text }]); return; } catch (e) {}
-  }
+  // 統一用站內可複製的文字框（不再呼叫 LINE 分享選單，避免當機/空白頁）
   showShareBox(text, '複製下面文字，貼到群組邀請大家一起參加 😊');
 }
 
@@ -267,10 +264,7 @@ async function promoShare() {
   const footer = '點進佈告欄報名 👇\n' + location.origin + '/';
   const text = header + '\n\n' + lines.join('\n\n') + '\n\n' + footer;
 
-  // LINE 內優先用分享選單；否則顯示可複製的宣傳文字
-  if (useLiff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker')) {
-    try { await liff.shareTargetPicker([{ type: 'text', text }]); return; } catch (e) {}
-  }
+  // 統一用站內可複製的文字框（不再呼叫 LINE 分享選單，避免當機/空白頁）
   showShareBox(text, '複製下面文字，貼到群組就能一次公告所有活動 😊');
 }
 
