@@ -94,3 +94,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang TC","Micr
 .name-input{width:100%;border:1px solid #d9dbde;border-radius:10px;padding:12px;font-size:15px;margin-bottom:12px;outline:none}
 .text-btn{background:none;border:none;color:#8a9099;font-size:14px;margin-top:10px;cursor:pointer}
 .hidden{display:none}
+
+/* 新增活動浮動按鈕 */
+.fab{position:fixed;right:calc(50% - 230px + 16px);bottom:24px;z-index:40;width:56px;height:56px;border-radius:50%;background:#06c755;color:#fff;border:none;font-size:30px;line-height:1;cursor:pointer;box-shadow:0 4px 14px rgba(6,199,85,.45)}
+@media(max-width:480px){.fab{right:16px}}
+
+/* 新增活動表單 */
+.form-body{padding:16px}
+.f-field{margin-bottom:14px}
+.f-field label{display:block;font-size:13px;color:#6b7076;margin-bottom:5px;font-weight:600}
+.f-field input,.f-field textarea,.f-field select{width:100%;border:1px solid #d9dbde;border-radius:10px;padding:11px 12px;font-size:15px;outline:none;font-family:inherit;box-sizing:border-box}
+.f-field textarea{min-height:84px;resize:vertical}
+.f-row2{display:flex;gap:10px}
+.f-row2 .f-field{flex:1}
+.f-hint{font-size:12px;color:#b4b9bf;margin-top:4px}

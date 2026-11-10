@@ -44,6 +44,11 @@ async function loadData() {
     CATS = []; EVENTS = [];
     signups = localStore.get('signups', {}); comments = localStore.get('cmts', {});
   }
+  // 試跑模式：把本機新增的活動也合併進來
+  if (!useLiff) {
+    const locals = localStore.get('localEvents', []);
+    locals.forEach((ev) => { if (!EVENTS.find((x) => x.id === ev.id)) EVENTS.push(ev); });
+  }
 }
 
 // ===== 渲染 =====
@@ -145,6 +150,9 @@ document.addEventListener('click', (e) => {
   if (e.target.id === 'loginBtn') { me ? logout() : openLogin(); return; }
   if (e.target.id === 'doLoginBtn') { doLogin(); return; }
   if (e.target.id === 'cancelLoginBtn' || e.target.id === 'loginMask') { $('#loginMask').classList.add('hidden'); return; }
+  if (e.target.id === 'fab') { openAddForm(); return; }
+  if (e.target.id === 'addSubmit') { submitNewEvent(); return; }
+  if (e.target.id === 'addCancel' || e.target.id === 'addClose' || e.target.id === 'addMask') { $('#addMask').classList.add('hidden'); return; }
 });
 document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && document.activeElement.id === 'cmtBox') sendComment(); });
 
@@ -187,6 +195,73 @@ async function sendComment() {
     catch (err) { alert(err.message); return; }
   } else { pushLocal(ev, text, false); }
   renderModal();
+}
+
+// ===== 新增活動表單 =====
+function openAddForm() {
+  if (!me) { alert('請先登入才能新增活動'); openLogin(); return; }
+  const today = new Date().toISOString().slice(0, 10);
+  const catOpts = CATS.map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
+  $('#addModal').innerHTML = `
+    <div class="m-head">
+      <button class="m-close" id="addClose">✕</button>
+      <div class="m-title">新增活動</div>
+    </div>
+    <div class="form-body">
+      <div class="f-field"><label>活動名稱 *</label><input id="fTitle" maxlength="60" placeholder="例：週五小酌局"></div>
+      <div class="f-row2">
+        <div class="f-field"><label>日期 *</label><input id="fDate" type="date" value="${today}"></div>
+        <div class="f-field"><label>分類</label><select id="fCat">${catOpts}</select></div>
+      </div>
+      <div class="f-field"><label>時間</label><input id="fTime" placeholder="例：19:30（或 11/06(五) 19:30）"></div>
+      <div class="f-field"><label>地點</label><input id="fPlace" placeholder="例：台北市中正區…"></div>
+      <div class="f-row2">
+        <div class="f-field"><label>費用</label><input id="fFee" placeholder="例：各付各的 / 450/人 / 免費"></div>
+        <div class="f-field"><label>人數上限</label><input id="fCap" type="number" min="1" value="6"></div>
+      </div>
+      <div class="f-field"><label>活動說明</label><textarea id="fDesc" placeholder="活動內容、注意事項…"></textarea></div>
+      <div class="f-hint">主揪會自動帶入你的登入名稱（${esc(me)}），並預設你已報名。</div>
+      <div class="act-row" style="margin-top:16px">
+        <button id="addCancel">取消</button>
+        <button id="addSubmit" class="green-btn" style="flex:2">建立活動</button>
+      </div>
+    </div>`;
+  $('#addMask').classList.remove('hidden');
+}
+
+async function submitNewEvent() {
+  const title = $('#fTitle').value.trim();
+  const date = $('#fDate').value;
+  if (!title) { alert('請填活動名稱'); return; }
+  if (!date) { alert('請選日期'); return; }
+  const payload = {
+    title, date,
+    cat: $('#fCat').value,
+    time: $('#fTime').value.trim() || date.slice(5).replace('-', '/'),
+    place: $('#fPlace').value.trim(),
+    fee: $('#fFee').value.trim(),
+    cap: parseInt($('#fCap').value, 10) || 6,
+    desc: $('#fDesc').value.trim(),
+  };
+  const btn = $('#addSubmit'); if (btn) { btn.disabled = true; btn.textContent = '建立中…'; }
+  try {
+    if (useLiff) {
+      const j = await api('/events', payload);
+      EVENTS.push(j.event);
+    } else {
+      // 試跑模式：存在本機（localStorage），重整仍在
+      const ev = { id: 'local' + Date.now(), host: me, members: [me], ...payload };
+      EVENTS.push(ev);
+      const locals = localStore.get('localEvents', []);
+      locals.push(ev); localStore.set('localEvents', locals);
+    }
+    $('#addMask').classList.add('hidden');
+    renderList();
+    alert('活動已建立！');
+  } catch (err) {
+    alert('建立失敗：' + err.message);
+    if (btn) { btn.disabled = false; btn.textContent = '建立活動'; }
+  }
 }
 
 // ===== 登入 =====
