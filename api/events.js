@@ -20,7 +20,8 @@ export default async function handler(req, res) {
       const list = await loadEvents();
       const signups = await getJSON('signups', {});
       const comments = await getJSON('comments', {});
-      return res.status(200).json({ cats: CATS, events: list, signups, comments });
+      const votes = await getJSON('votes', {});
+      return res.status(200).json({ cats: CATS, events: list, signups, comments, votes });
     }
 
     if (req.method === 'POST') {
@@ -38,10 +39,13 @@ export default async function handler(req, res) {
         await setJSON('events', list);
         const signups = await getJSON('signups', {});
         const comments = await getJSON('comments', {});
+        const votes = await getJSON('votes', {});
         delete signups[body.eventId];
         delete comments[body.eventId];
+        delete votes[body.eventId];
         await setJSON('signups', signups);
         await setJSON('comments', comments);
+        await setJSON('votes', votes);
         return res.status(200).json({ ok: true, canceled: body.eventId });
       }
 
@@ -59,6 +63,9 @@ export default async function handler(req, res) {
         cap: Math.max(1, parseInt(body.cap, 10) || 6),
         desc: String(body.desc || '').slice(0, 1000),
         members: [user.name],
+        dateOptions: Array.isArray(body.dateOptions)
+          ? [...new Set(body.dateOptions.map((d) => String(d).slice(0, 10)).filter(Boolean))].sort().slice(0, 8)
+          : [],
       };
       list.push(ev);
       await setJSON('events', list);
