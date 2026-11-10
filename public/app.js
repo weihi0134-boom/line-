@@ -5,7 +5,7 @@ const CFG = window.APP_CONFIG || { LIFF_ID: '', API_BASE: '/api' };
 const useLiff = !!CFG.LIFF_ID;
 
 // 狀態
-let CATS = [], EVENTS = [], signups = {}, comments = {};
+let CATS = [], EVENTS = [], signups = {}, comments = {}, votes = {};
 let me = null, idToken = null, picUrl = '';
 let activeCat = null, curEvent = null, curTab = 'info';
 let sortOrder = 'desc'; // 'desc' 日期新→舊；'asc' 日期舊→新
@@ -22,6 +22,7 @@ function membersOf(ev) {
   return base;
 }
 function commentsOf(ev) { return (ev.comments || []).concat(comments[ev.id] || []); }
+function votesOf(ev) { return votes[ev.id] || {}; }
 function nowHM() { const d = new Date(); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; }
 
 // ===== 資料存取：有 LIFF 走 API，否則走 localStorage =====
@@ -39,16 +40,18 @@ async function loadData() {
   try {
     const r = await fetch(CFG.API_BASE + '/events');
     const j = await r.json();
-    CATS = j.cats; EVENTS = j.events; signups = j.signups || {}; comments = j.comments || {};
+    CATS = j.cats; EVENTS = j.events; signups = j.signups || {}; comments = j.comments || {}; votes = j.votes || {};
   } catch (e) {
     // 無後端時的本機備援（理論上 Vercel 上不會發生）
     CATS = []; EVENTS = [];
-    signups = localStore.get('signups', {}); comments = localStore.get('cmts', {});
+    signups = localStore.get('signups', {}); comments = localStore.get('cmts', {}); votes = localStore.get('votes', {});
   }
   // 試跑模式：把本機新增的活動也合併進來
   if (!useLiff) {
     const locals = localStore.get('localEvents', []);
     locals.forEach((ev) => { if (!EVENTS.find((x) => x.id === ev.id)) EVENTS.push(ev); });
+    const lv = localStore.get('votes', {});
+    Object.keys(lv).forEach((k) => { votes[k] = lv[k]; });
   }
 }
 
@@ -93,6 +96,8 @@ function renderModal() {
   const ev = curEvent; if (!ev) return;
   const mem = membersOf(ev), cnt = mem.length, full = cnt >= ev.cap;
   const joined = me && mem.includes(me);
+  const hasPoll = Array.isArray(ev.dateOptions) && ev.dateOptions.length > 0;
+  if (curTab === 'poll' && !hasPoll) curTab = 'info';
   let body;
   if (curTab === 'info') {
     body = `<div class="m-body">
@@ -115,6 +120,32 @@ function renderModal() {
         : `<button class="green-btn" id="joinBtn" ${full ? 'disabled' : ''}>${full ? '揪團已滿' : '參加活動'}</button>`}
       ${me && me === ev.host ? `<button class="cancel-event-btn" id="cancelEventBtn">取消揪團（刪除此活動）</button>` : ''}
     </div>`;
+  } else if (curTab === 'poll') {
+    const vt = votesOf(ev);
+    const opts = ev.dateOptions.slice();
+    const counts = opts.map((d) => (vt[d] || []).length);
+    const maxC = counts.length ? Math.max(...counts) : 0;
+    body = `<div class="m-body poll-wrap">
+      <div class="poll-tip">點你方便的日期，可以複選 。票數最高的就是大家最喬得出來的那一天 😊</div>
+      ${opts.map((d) => {
+        const voters = vt[d] || [];
+        const n = voters.length;
+        const mine = me && voters.includes(me);
+        const top = n > 0 && n === maxC;
+        const dd = d.split('-');
+        const wd = WD[new Date(d).getDay()];
+        const pct = maxC ? Math.round((n / maxC) * 100) : 0;
+        return `<div class="poll-row${top ? ' poll-top' : ''}">
+          <div class="poll-date"><div class="pd-d">${esc(dd[1])}/${esc(dd[2])}</div><div class="pd-w">週${wd}${top ? ' ★' : ''}</div></div>
+          <div class="poll-mid">
+            <div class="poll-bar"><span style="width:${pct}%"></span></div>
+            <div class="poll-voters">${n ? esc(voters.join('、')) : '還沒有人投'}</div>
+          </div>
+          <button class="poll-btn${mine ? ' voted' : ''}" data-vote="${esc(d)}" ${me ? '' : 'disabled'}>${mine ? '✓ 我可以' : '我可以'}<span class="pb-n">${n}</span></button>
+        </div>`;
+      }).join('')}
+      ${me ? '' : '<div class="poll-login">請先登入才能投票喔</div>'}
+    </div>`;
   } else {
     const cs = commentsOf(ev);
     body = `<div class="m-body cmt-list">
@@ -136,6 +167,7 @@ function renderModal() {
     </div>
     <div class="m-tabs">
       <div class="m-tab ${curTab === 'info' ? 'active' : ''}" data-tab="info">活動詳情</div>
+      ${hasPoll ? `<div class="m-tab ${curTab === 'poll' ? 'active' : ''}" data-tab="poll">喬日期</div>` : ''}
       <div class="m-tab ${curTab === 'cmt' ? 'active' : ''}" data-tab="cmt">活動留言 (${commentsOf(ev).length})</div>
     </div>${body}`;
 }
@@ -150,6 +182,9 @@ document.addEventListener('click', (e) => {
   const tab = e.target.closest('.m-tab');
   if (tab) { curTab = tab.dataset.tab; renderModal(); return; }
   if (e.target.id === 'joinBtn') { toggleJoin(); return; }
+  const voteBtn = e.target.closest('[data-vote]');
+  if (voteBtn) { voteDate(voteBtn.dataset.vote); return; }
+  if (e.target.id === 'addDateOpt') { addDateOptField(); return; }
   if (e.target.closest('#sortBtn, [data-sort]')) { toggleSort(); return; }
   if (e.target.closest('#promoBtn, [data-view="promo"]')) { promoShare(); return; }
   if (e.target.id === 'cancelEventBtn') { cancelEvent(); return; }
@@ -301,6 +336,23 @@ async function cancelEvent() {
 }
 function pushLocal(ev, text, sys) { (comments[ev.id] || (comments[ev.id] = [])).push({ u: me, t: nowHM(), x: text, sys: !!sys }); localStore.set('cmts', comments); }
 
+// 喬日期：點一下 = 投這天我可以，再點一次 = 收回（可複選）
+async function voteDate(date) {
+  if (!me) { openLogin(); return; }
+  const ev = curEvent; if (!ev) return;
+  if (useLiff) {
+    try { const j = await api('/vote', { eventId: ev.id, date }); votes[ev.id] = j.votes || {}; }
+    catch (err) { alert(err.message); return; }
+  } else {
+    const bucket = votes[ev.id] || (votes[ev.id] = {});
+    const arr = bucket[date] || (bucket[date] = []);
+    if (arr.includes(me)) bucket[date] = arr.filter((n) => n !== me);
+    else arr.push(me);
+    localStore.set('votes', votes);
+  }
+  renderModal();
+}
+
 async function sendComment() {
   const box = $('#cmtBox'); if (!box || !box.value.trim()) return;
   const ev = curEvent, text = box.value.trim();
@@ -334,6 +386,15 @@ function openAddForm() {
         <div class="f-field"><label>人數上限</label><input id="fCap" type="number" min="1" value="6"></div>
       </div>
       <div class="f-field"><label>活動說明</label><textarea id="fDesc" placeholder="活動內容、注意事項…"></textarea></div>
+      <div class="f-field">
+        <label>大家一起投票喬日期（選填）</label>
+        <div class="f-hint" style="margin:0 0 7px">日期還沒定？列幾個候選日，讓大家進來投自己方便的那一天。不填就是一般活動。</div>
+        <div id="dateOptList">
+          <input class="f-dateopt" type="date">
+          <input class="f-dateopt" type="date">
+        </div>
+        <button type="button" id="addDateOpt" class="add-dateopt-btn">＋ 再加一個候選日</button>
+      </div>
       <div class="f-hint">主揪會自動帶入你的登入名稱（${esc(me)}），並預設你已報名。</div>
       <div class="act-row" style="margin-top:16px">
         <button id="addCancel">取消</button>
@@ -341,6 +402,15 @@ function openAddForm() {
       </div>
     </div>`;
   $('#addMask').classList.remove('hidden');
+}
+
+// 在表單多加一個候選日期欄位（最多 8 個）
+function addDateOptField() {
+  const box = $('#dateOptList'); if (!box) return;
+  if (box.querySelectorAll('.f-dateopt').length >= 8) { alert('候選日最多 8 個喔～'); return; }
+  const inp = document.createElement('input');
+  inp.className = 'f-dateopt'; inp.type = 'date';
+  box.appendChild(inp);
 }
 
 async function submitNewEvent() {
@@ -356,6 +426,7 @@ async function submitNewEvent() {
     fee: $('#fFee').value.trim(),
     cap: parseInt($('#fCap').value, 10) || 6,
     desc: $('#fDesc').value.trim(),
+    dateOptions: Array.from(document.querySelectorAll('.f-dateopt')).map((i) => i.value).filter(Boolean),
   };
   const btn = $('#addSubmit'); if (btn) { btn.disabled = true; btn.textContent = '建立中…'; }
   try {
