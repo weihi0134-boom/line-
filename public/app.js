@@ -104,7 +104,7 @@ function renderModal() {
       <div class="members-head"><span>已報名成員名冊</span><span class="ratio">${cnt}/${ev.cap}</span></div>
       <div class="avatars">${mem.map((n) => `<div class="avatar"><div class="pic">${esc(initial(n))}</div><div class="nm">${esc(n)}</div></div>`).join('')}</div>
       <div class="act-row">
-        <button data-act="share">分享</button>
+        <button data-act="share">📋 複製邀請</button>
         <button data-act="cal">加到日曆</button>
         <button data-act="close2">關閉</button>
       </div>
@@ -173,11 +173,75 @@ function doAct(a) {
     (useLiff && liff.isInClient()) ? liff.openWindow({ url, external: true }) : window.open(url, '_blank');
     return;
   }
-  if (a === 'share') {
-    if (useLiff && liff.isApiAvailable('shareTargetPicker')) {
-      liff.shareTargetPicker([{ type: 'text', text: `【${ev.title}】${ev.time} @ ${ev.place}` }]);
-    } else { alert('分享功能需在 LINE 內開啟'); }
+  if (a === 'share') { shareEvent(ev); return; }
+}
+
+// 共用：跳出「分享文字」視窗——文字會自動選起來，按複製或長按複製都行
+function showShareBox(text, tip) {
+  const old = document.getElementById('shareBox'); if (old) old.remove();
+  const mask = document.createElement('div');
+  mask.id = 'shareBox';
+  mask.style.cssText = 'position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:20px';
+  const card = document.createElement('div');
+  card.style.cssText = 'background:#fff;border-radius:16px;width:100%;max-width:420px;padding:18px;box-shadow:0 8px 30px rgba(0,0,0,.25)';
+  const h = document.createElement('div');
+  h.style.cssText = 'font-size:15px;font-weight:700;color:#0e4e5a;margin-bottom:10px';
+  h.textContent = tip || '複製下面文字，貼到群組邀請大家';
+  const ta = document.createElement('textarea');
+  ta.readOnly = true; ta.value = text;
+  ta.style.cssText = 'width:100%;height:190px;border:1px solid #d9dbde;border-radius:10px;padding:12px;font-size:14px;line-height:1.6;resize:none;outline:none;color:#333;box-sizing:border-box';
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:8px;margin-top:12px';
+  const copyBtn = document.createElement('button');
+  copyBtn.textContent = '複製文字';
+  copyBtn.style.cssText = 'flex:2;background:#2b8296;color:#fff;border:none;border-radius:10px;padding:12px 0;font-size:15px;font-weight:700;cursor:pointer';
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = '關閉';
+  closeBtn.style.cssText = 'flex:1;background:#f1f2f4;color:#4a4f55;border:none;border-radius:10px;padding:12px 0;font-size:15px;cursor:pointer';
+  row.appendChild(copyBtn); row.appendChild(closeBtn);
+  card.appendChild(h); card.appendChild(ta); card.appendChild(row);
+  mask.appendChild(card); document.body.appendChild(mask);
+
+  // 自動選起文字，方便直接複製
+  setTimeout(() => { ta.focus(); ta.select(); try { ta.setSelectionRange(0, text.length); } catch (e) {} }, 50);
+
+  copyBtn.onclick = () => {
+    ta.focus(); ta.select(); try { ta.setSelectionRange(0, text.length); } catch (e) {}
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    if (!ok && navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => { copyBtn.textContent = '✓ 已複製'; })
+        .catch(() => { copyBtn.textContent = '請長按文字選取複製'; });
+    } else {
+      copyBtn.textContent = ok ? '✓ 已複製' : '請長按文字選取複製';
+    }
+  };
+  closeBtn.onclick = () => mask.remove();
+  mask.onclick = (e) => { if (e.target === mask) mask.remove(); };
+}
+
+// 單一活動：把完整細節整理成文字，複製後貼到群組邀請大家
+async function shareEvent(ev) {
+  if (!ev) return;
+  const cnt = membersOf(ev).length;
+  const lines = [
+    `🎉 【揪團】${ev.title}`,
+    '',
+    `📅 時間：${ev.time || ev.date}`,
+    `📍 地點：${ev.place || '-'}`,
+  ];
+  if (ev.fee) lines.push(`💰 費用：${ev.fee}`);
+  if (ev.host) lines.push(`⭐ 主揪：${ev.host}`);
+  lines.push(`👥 人數：${cnt}/${ev.cap} 人`);
+  if (ev.desc) lines.push('', ev.desc);
+  lines.push('', '點進佈告欄報名 👇', location.origin + '/');
+  const text = lines.join('\n');
+
+  // 在 LINE 內優先跳分享選單；否則顯示可複製的邀請文字
+  if (useLiff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker')) {
+    try { await liff.shareTargetPicker([{ type: 'text', text }]); return; } catch (e) {}
   }
+  showShareBox(text, '複製下面文字，貼到群組邀請大家一起參加 😊');
 }
 
 // 切換排序：日期新→舊 ↔ 日期舊→新
@@ -203,22 +267,11 @@ async function promoShare() {
   const footer = '點進佈告欄報名 👇\n' + location.origin + '/';
   const text = header + '\n\n' + lines.join('\n\n') + '\n\n' + footer;
 
-  // LINE 內優先用分享選單；否則複製到剪貼簿
+  // LINE 內優先用分享選單；否則顯示可複製的宣傳文字
   if (useLiff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker')) {
     try { await liff.shareTargetPicker([{ type: 'text', text }]); return; } catch (e) {}
   }
-  try {
-    await navigator.clipboard.writeText(text);
-    alert('已複製所有活動內容！\n到群組裡長按「貼上」就可以發報囉 😊');
-  } catch (e) {
-    // 舊瀏覽器備援：用暗藏 textarea + execCommand
-    const ta = document.createElement('textarea');
-    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
-    document.body.appendChild(ta); ta.focus(); ta.select();
-    let ok = false; try { ok = document.execCommand('copy'); } catch (e2) {}
-    document.body.removeChild(ta);
-    alert(ok ? '已複製所有活動內容！到群組貼上即可 😊' : '複製失敗，請手動選取內容複製');
-  }
+  showShareBox(text, '複製下面文字，貼到群組就能一次公告所有活動 😊');
 }
 
 async function toggleJoin() {
@@ -333,7 +386,13 @@ async function submitNewEvent() {
 
 // ===== 登入 =====
 function openLogin() {
-  if (useLiff) { liff.login(); return; }
+  if (useLiff) {
+    try {
+      // 回到此頁登入完成後的導回網址（固定為首頁）
+      liff.login({ redirectUri: location.origin + '/' });
+    } catch (e) { liff.login(); }
+    return;
+  }
   $('#loginDesc').innerHTML = '（試跑模式：輸入名稱即可登入）';
   $('#loginMask').classList.remove('hidden');
 }
@@ -351,10 +410,15 @@ function logout() {
 async function boot() {
   if (useLiff) {
     try {
-      await liff.init({ liffId: CFG.LIFF_ID });
+      // withLoginOnExternalBrowser：在一般瀏覽器（非 LINE App）也能直接完成登入，
+      // 不會卡在「要在 LINE 中打開嗎」而登入失敗。
+      await liff.init({ liffId: CFG.LIFF_ID, withLoginOnExternalBrowser: true });
       if (liff.isLoggedIn()) {
-        const p = await liff.getProfile();
-        me = p.displayName; picUrl = p.pictureUrl || ''; idToken = liff.getIDToken();
+        try {
+          const p = await liff.getProfile();
+          me = p.displayName; picUrl = p.pictureUrl || '';
+        } catch (e) { console.warn('getProfile failed', e); }
+        try { idToken = liff.getIDToken() || null; } catch (e) { idToken = null; }
       }
     } catch (e) { console.warn('liff init failed', e); }
   } else {
