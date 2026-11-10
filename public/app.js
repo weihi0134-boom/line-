@@ -8,6 +8,7 @@ const useLiff = !!CFG.LIFF_ID;
 let CATS = [], EVENTS = [], signups = {}, comments = {};
 let me = null, idToken = null, picUrl = '';
 let activeCat = null, curEvent = null, curTab = 'info';
+let sortOrder = 'desc'; // 'desc' 日期新→舊；'asc' 日期舊→新
 
 const localStore = {
   get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
@@ -64,7 +65,9 @@ function renderCats() {
   ).join('');
 }
 function renderList() {
-  let list = EVENTS.slice().sort((a, b) => a.date.localeCompare(b.date));
+  let list = EVENTS.slice().sort((a, b) =>
+    sortOrder === 'asc' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date)
+  );
   if (activeCat) list = list.filter((e) => e.cat === activeCat);
   const el = $('#eventList');
   if (!list.length) { el.innerHTML = '<div class="foot-note">目前沒有活動</div>'; return; }
@@ -147,6 +150,8 @@ document.addEventListener('click', (e) => {
   const tab = e.target.closest('.m-tab');
   if (tab) { curTab = tab.dataset.tab; renderModal(); return; }
   if (e.target.id === 'joinBtn') { toggleJoin(); return; }
+  if (e.target.closest('#sortBtn, [data-sort]')) { toggleSort(); return; }
+  if (e.target.closest('#promoBtn, [data-view="promo"]')) { promoShare(); return; }
   if (e.target.id === 'cancelEventBtn') { cancelEvent(); return; }
   if (e.target.id === 'cmtSend') { sendComment(); return; }
   const act = e.target.closest('[data-act]');
@@ -172,6 +177,47 @@ function doAct(a) {
     if (useLiff && liff.isApiAvailable('shareTargetPicker')) {
       liff.shareTargetPicker([{ type: 'text', text: `【${ev.title}】${ev.time} @ ${ev.place}` }]);
     } else { alert('分享功能需在 LINE 內開啟'); }
+  }
+}
+
+// 切換排序：日期新→舊 ↔ 日期舊→新
+function toggleSort() {
+  sortOrder = sortOrder === 'desc' ? 'asc' : 'desc';
+  const btn = $('#sortBtn') || $('[data-sort]');
+  if (btn) btn.textContent = (sortOrder === 'desc' ? '排序：新→舊' : '排序：舊→新') + ' ▾';
+  renderList();
+}
+
+// 宣傳：把目前所有活動整理成文字，複製到剪貼簿，貼到群組即可
+async function promoShare() {
+  let list = EVENTS.slice().sort((a, b) =>
+    sortOrder === 'asc' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date)
+  );
+  if (!list.length) { alert('目前沒有活動可以宣傳喔～'); return; }
+  const lines = list.map((ev) => {
+    const cnt = membersOf(ev).length;
+    const t = ev.time || ev.date;
+    return `▶ ${ev.title}\n   📅 ${t}\n   📍 ${ev.place}\n   👥 ${cnt}/${ev.cap} 人`;
+  });
+  const header = '🎉 真媽機群組活動佈告欄 ◈ 最新揪團';
+  const footer = '點進佈告欄報名 👇\n' + location.origin + '/';
+  const text = header + '\n\n' + lines.join('\n\n') + '\n\n' + footer;
+
+  // LINE 內優先用分享選單；否則複製到剪貼簿
+  if (useLiff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker')) {
+    try { await liff.shareTargetPicker([{ type: 'text', text }]); return; } catch (e) {}
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    alert('已複製所有活動內容！\n到群組裡長按「貼上」就可以發報囉 😊');
+  } catch (e) {
+    // 舊瀏覽器備援：用暗藏 textarea + execCommand
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    let ok = false; try { ok = document.execCommand('copy'); } catch (e2) {}
+    document.body.removeChild(ta);
+    alert(ok ? '已複製所有活動內容！到群組貼上即可 😊' : '複製失敗，請手動選取內容複製');
   }
 }
 
