@@ -8,6 +8,7 @@ const useLiff = !!CFG.LIFF_ID;
 let CATS = [], EVENTS = [], signups = {}, comments = {}, votes = {};
 let me = null, idToken = null, picUrl = '';
 let activeCat = null, curEvent = null, curTab = 'info';
+let curEditId = null;
 let sortOrder = 'desc'; // 'desc' 日期新→舊；'asc' 日期舊→新
 
 const localStore = {
@@ -118,6 +119,7 @@ function renderModal() {
       ${joined
         ? `<button class="green-btn leave-btn" id="joinBtn">取消報名</button>`
         : `<button class="green-btn" id="joinBtn" ${full ? 'disabled' : ''}>${full ? '揪團已滿' : '參加活動'}</button>`}
+      ${me && me === ev.host ? `<button class="edit-event-btn" id="editEventBtn">✏️ 編輯活動</button>` : ''}
       ${me && me === ev.host ? `<button class="cancel-event-btn" id="cancelEventBtn">取消揪團（刪除此活動）</button>` : ''}
     </div>`;
   } else if (curTab === 'poll') {
@@ -188,6 +190,8 @@ document.addEventListener('click', (e) => {
   if (e.target.closest('#sortBtn, [data-sort]')) { toggleSort(); return; }
   if (e.target.closest('#promoBtn, [data-view="promo"]')) { promoShare(); return; }
   if (e.target.id === 'cancelEventBtn') { cancelEvent(); return; }
+  if (e.target.id === 'editEventBtn') { openEditForm(); return; }
+  if (e.target.id === 'editSubmit') { submitEditEvent(); return; }
   if (e.target.id === 'cmtSend') { sendComment(); return; }
   const act = e.target.closest('[data-act]');
   if (act) { doAct(act.dataset.act); return; }
@@ -446,6 +450,89 @@ async function submitNewEvent() {
   } catch (err) {
     alert('建立失敗：' + err.message);
     if (btn) { btn.disabled = false; btn.textContent = '建立活動'; }
+  }
+}
+
+// ===== 編輯活動表單（限主揪）=====
+function openEditForm() {
+  const ev = curEvent; if (!ev) return;
+  if (!me || me !== ev.host) { alert('只有主揪本人可以編輯活動'); return; }
+  curEditId = ev.id;
+  const catOpts = CATS.map((c) => `<option value="${esc(c.id)}"${c.id === ev.cat ? ' selected' : ''}>${esc(c.name)}</option>`).join('');
+  const opts = (ev.dateOptions && ev.dateOptions.length) ? ev.dateOptions.slice() : ['', ''];
+  const optInputs = opts.map((d) => `<input class="f-dateopt" type="date" value="${esc(d)}">`).join('');
+  $('#addModal').innerHTML = `
+    <div class="m-head">
+      <button class="m-close" id="addClose">✕</button>
+      <div class="m-title">編輯活動</div>
+    </div>
+    <div class="form-body">
+      <div class="f-field"><label>活動名稱 *</label><input id="fTitle" maxlength="60" value="${esc(ev.title)}"></div>
+      <div class="f-row2">
+        <div class="f-field"><label>日期 *</label><input id="fDate" type="date" value="${esc(ev.date)}"></div>
+        <div class="f-field"><label>分類</label><select id="fCat">${catOpts}</select></div>
+      </div>
+      <div class="f-field"><label>時間</label><input id="fTime" value="${esc(ev.time || '')}"></div>
+      <div class="f-field"><label>地點</label><input id="fPlace" value="${esc(ev.place || '')}"></div>
+      <div class="f-row2">
+        <div class="f-field"><label>費用</label><input id="fFee" value="${esc(ev.fee || '')}"></div>
+        <div class="f-field"><label>人數上限</label><input id="fCap" type="number" min="1" value="${esc(ev.cap)}"></div>
+      </div>
+      <div class="f-field"><label>活動說明</label><textarea id="fDesc">${esc(ev.desc || '')}</textarea></div>
+      <div class="f-field">
+        <label>大家一起投票喬日期（選填）</label>
+        <div class="f-hint" style="margin:0 0 7px">列幾個候選日讓大家投。想移除某一天，把那格日期清空即可。</div>
+        <div id="dateOptList">${optInputs}</div>
+        <button type="button" id="addDateOpt" class="add-dateopt-btn">＋ 再加一個候選日</button>
+      </div>
+      <div class="act-row" style="margin-top:16px">
+        <button id="addCancel">取消</button>
+        <button id="editSubmit" class="green-btn" style="flex:2">儲存變更</button>
+      </div>
+    </div>`;
+  $('#addMask').classList.remove('hidden');
+}
+
+async function submitEditEvent() {
+  const id = curEditId; if (!id) return;
+  const title = $('#fTitle').value.trim();
+  const date = $('#fDate').value;
+  if (!title) { alert('請填活動名稱'); return; }
+  if (!date) { alert('請選日期'); return; }
+  const fields = {
+    title, date,
+    cat: $('#fCat').value,
+    time: $('#fTime').value.trim() || date.slice(5).replace('-', '/'),
+    place: $('#fPlace').value.trim(),
+    fee: $('#fFee').value.trim(),
+    cap: parseInt($('#fCap').value, 10) || 6,
+    desc: $('#fDesc').value.trim(),
+    dateOptions: Array.from(document.querySelectorAll('.f-dateopt')).map((i) => i.value).filter(Boolean),
+  };
+  const btn = $('#editSubmit'); if (btn) { btn.disabled = true; btn.textContent = '儲存中…'; }
+  try {
+    if (useLiff) {
+      const j = await api('/events', { action: 'edit', eventId: id, ...fields });
+      const i = EVENTS.findIndex((e) => e.id === id);
+      if (i >= 0) EVENTS[i] = j.event;
+      curEvent = j.event;
+    } else {
+      const ev = EVENTS.find((e) => e.id === id);
+      if (ev) {
+        Object.assign(ev, fields);
+        const locals = localStore.get('localEvents', []);
+        const li = locals.findIndex((e) => e.id === id);
+        if (li >= 0) { locals[li] = ev; localStore.set('localEvents', locals); }
+        curEvent = ev;
+      }
+    }
+    $('#addMask').classList.add('hidden');
+    curEditId = null;
+    renderList(); renderModal();
+    alert('活動已更新！');
+  } catch (err) {
+    alert('更新失敗：' + err.message);
+    if (btn) { btn.disabled = false; btn.textContent = '儲存變更'; }
   }
 }
 
