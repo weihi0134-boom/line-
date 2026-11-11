@@ -7,6 +7,7 @@ export const CATS = [
   { id: 'travel', name: '旅遊', n: 0 },
   { id: 'sing', name: '唱歌', n: 0 },
   { id: 'teatime', name: '下午茶', n: 0 },
+  { id: 'gathering', name: '聚會', n: 0 },
 ];
 
 export const EVENTS = [];

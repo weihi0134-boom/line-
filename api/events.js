@@ -49,6 +49,31 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: true, canceled: body.eventId });
       }
 
+      // 編輯活動內容（限主揪本人）
+      if (body.action === 'edit') {
+        const list = await loadEvents();
+        const ev = list.find((e) => e.id === body.eventId);
+        if (!ev) return res.status(404).json({ error: '找不到這個活動' });
+        if (ev.host !== user.name) return res.status(403).json({ error: '只有主揪本人可以編輯活動' });
+        const signups = await getJSON('signups', {});
+        const base = ev.members.slice();
+        (signups[body.eventId] || []).forEach((n) => { if (!base.includes(n)) base.push(n); });
+        const joinedCount = base.length;
+        if (body.title !== undefined) ev.title = String(body.title || ev.title).slice(0, 60);
+        if (body.date !== undefined) ev.date = String(body.date || ev.date).slice(0, 10);
+        if (body.cat !== undefined) ev.cat = String(body.cat || ev.cat);
+        if (body.time !== undefined) ev.time = String(body.time || '');
+        if (body.place !== undefined) ev.place = String(body.place || '');
+        if (body.fee !== undefined) ev.fee = String(body.fee || '');
+        if (body.desc !== undefined) ev.desc = String(body.desc || '').slice(0, 1000);
+        if (body.cap !== undefined) ev.cap = Math.max(1, joinedCount, parseInt(body.cap, 10) || 1);
+        if (Array.isArray(body.dateOptions)) {
+          ev.dateOptions = [...new Set(body.dateOptions.map((d) => String(d).slice(0, 10)).filter(Boolean))].sort().slice(0, 8);
+        }
+        await setJSON('events', list);
+        return res.status(200).json({ ok: true, event: ev });
+      }
+
       // 新增活動（需登入）
       const list = await loadEvents();
       const ev = {
