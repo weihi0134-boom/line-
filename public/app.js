@@ -208,11 +208,34 @@ function doAct(a) {
   const ev = curEvent;
   if (a === 'close2') { closeModal(); return; }
   if (a === 'cal') {
-    const url = 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=' + encodeURIComponent(ev.title) + '&details=' + encodeURIComponent(ev.desc) + '&location=' + encodeURIComponent(ev.place);
+    const url = 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=' + encodeURIComponent(ev.title) + '&details=' + encodeURIComponent(ev.desc) + '&location=' + encodeURIComponent(ev.place) + calDatesParam(ev);
     (useLiff && liff.isInClient()) ? liff.openWindow({ url, external: true }) : window.open(url, '_blank');
     return;
   }
   if (a === 'share') { shareEvent(ev); return; }
+}
+
+// 把活動日期＋時間轉成 Google 日曆需要的 dates 參數
+// 有填時間 → 從該時間起算 2 小時；沒填時間 → 整天活動
+function calDatesParam(ev) {
+  if (!ev || !ev.date) return '';
+  const ymd = ev.date.replace(/-/g, '');
+  const pad = (n) => String(n).padStart(2, '0');
+  const m = String(ev.time || '').match(/(\d{1,2}):(\d{2})/);
+  if (m) {
+    const h = Math.min(23, parseInt(m[1], 10));
+    const mi = Math.min(59, parseInt(m[2], 10));
+    const startD = new Date(`${ev.date}T${pad(h)}:${pad(mi)}:00`);
+    if (isNaN(startD.getTime())) return `&dates=${ymd}/${ymd}`;
+    const endD = new Date(startD.getTime() + 2 * 60 * 60 * 1000);
+    const fmt = (d) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+    return `&dates=${fmt(startD)}/${fmt(endD)}`;
+  }
+  const d0 = new Date(`${ev.date}T00:00:00`);
+  if (isNaN(d0.getTime())) return '';
+  const d1 = new Date(d0.getTime() + 24 * 60 * 60 * 1000);
+  const fmtDay = (d) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+  return `&dates=${fmtDay(d0)}/${fmtDay(d1)}`;
 }
 
 // 共用：跳出「分享文字」視窗——文字會自動選起來，按複製或長按複製都行
