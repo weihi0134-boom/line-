@@ -265,10 +265,10 @@ function showShareBox(text, tip) {
   mask.appendChild(card); document.body.appendChild(mask);
 
   // 自動選起文字，方便直接複製
-  setTimeout(() => { ta.focus(); ta.select(); try { ta.setSelectionRange(0, text.length); } catch (e) {} }, 50);
+  setTimeout(() => { ta.focus(); ta.select(); try { ta.setSelectionRange(0, text.length); } catch (e) {} ta.scrollTop = 0; }, 50);
 
   copyBtn.onclick = () => {
-    ta.focus(); ta.select(); try { ta.setSelectionRange(0, text.length); } catch (e) {}
+    ta.focus(); ta.select(); try { ta.setSelectionRange(0, text.length); } catch (e) {} ta.scrollTop = 0;
     let ok = false;
     try { ok = document.execCommand('copy'); } catch (e) {}
     if (!ok && navigator.clipboard) {
@@ -282,6 +282,24 @@ function showShareBox(text, tip) {
   mask.onclick = (e) => { if (e.target === mask) mask.remove(); };
 }
 
+// 日期／時間統一格式（宣傳與複製邀請共用）
+function evDateText(ev) {
+  const s = String((ev && ev.date) || '').trim();
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return s || '日期未定';
+  const d = new Date(`${m[1]}-${m[2]}-${m[3]}T00:00:00`);
+  const wd = isNaN(d.getTime()) ? '' : `（週${WD[d.getDay()]}）`;
+  return `${m[1]}/${m[2]}/${m[3]}${wd}`;
+}
+function evTimeText(ev) {
+  const t = String((ev && ev.time) || '').trim();
+  if (!t) return '時間未定';
+  const clock = t.match(/\d{1,2}[:：]\d{2}(?:\s*[-~～至]\s*\d{1,2}[:：]\d{2})?/);
+  if (clock) return clock[0].replace(/：/g, ':');
+  if (/^\d{1,4}[-/]\d{1,2}/.test(t)) return '時間未定';
+  return t;
+}
+
 // 單一活動：把完整細節整理成文字，複製後貼到群組邀請大家
 async function shareEvent(ev) {
   if (!ev) return;
@@ -289,7 +307,8 @@ async function shareEvent(ev) {
   const lines = [
     `🎉 【揪團】${ev.title}`,
     '',
-    `📅 時間：${ev.time || ev.date}`,
+    `📅 日期：${evDateText(ev)}`,
+    `🕒 時間：${evTimeText(ev)}`,
     `📍 地點：${ev.place || '-'}`,
   ];
   if (ev.fee) lines.push(`💰 費用：${ev.fee}`);
@@ -319,11 +338,7 @@ async function promoShare() {
   if (!list.length) { alert('目前沒有活動可以宣傳喔～'); return; }
   const lines = list.map((ev) => {
     const cnt = membersOf(ev).length;
-    const date = String(ev.date || '').replace(/-/g, '/');
-    const time = String(ev.time || '').trim();
-    const clock = time.match(/\d{1,2}[:：]\d{2}(?:\s*[-~～至]\s*\d{1,2}[:：]\d{2})?/);
-    const timeText = clock ? clock[0] : (time && !/^\d{1,4}[-/]\d{1,2}/.test(time) ? time : '時間未定');
-    return `▶ ${ev.title}\n   📅 日期：${date}\n   🕒 時間：${timeText}\n   📍 ${ev.place}\n   👥 ${cnt}/${ev.cap} 人`;
+    return `▶ ${ev.title}\n   📅 日期：${evDateText(ev)}\n   🕒 時間：${evTimeText(ev)}\n   📍 ${ev.place}\n   👥 ${cnt}/${ev.cap} 人`;
   });
   const header = '🎉 UCCU活動佈告欄 ◈ 最新揪團';
   const footer = '點進佈告欄報名 👇\n' + location.origin + '/';
