@@ -132,3 +132,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang TC","Micr
 .poll-btn .pb-n{background:rgba(14,78,90,.12);border-radius:10px;padding:0 7px;font-size:12px;line-height:18px;min-width:18px;text-align:center}
 .poll-login{font-size:13px;color:#b4622e;text-align:center;margin-top:6px}
 .f-hint{font-size:12px;color:#b4b9bf;margin-top:4px}
+
+/* UCCU：表單在活動詳情上方，點編輯立即可操作 */
+#addMask{z-index:60}
+#addMask .modal{animation:none}
+#loginMask{z-index:70}
+/* 限定活動表單，保留其他青藍色介面 */
+.f-row2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+.f-row2 .f-field{min-width:0}
+.f-field input,.f-field select{min-width:0;max-width:100%;min-height:46px;background:#f4fbfd;border:1px solid #b7d9e2;border-radius:12px;color:#0e4e5a;font-size:16px}
+.f-field input:focus,.f-field select:focus{border-color:#2b8296;box-shadow:0 0 0 3px rgba(43,130,150,.12)}
+@media(max-width:480px){
+  .f-row2:has(#fDate){grid-template-columns:minmax(0,1fr);gap:0}
+  .f-row2:has(#fDate) .f-field{margin-bottom:16px}
+  .f-field input[type=date]{display:block;width:100%;-webkit-appearance:none;appearance:none}
+}

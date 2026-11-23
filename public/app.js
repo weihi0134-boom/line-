@@ -190,7 +190,7 @@ document.addEventListener('click', (e) => {
   if (e.target.closest('#sortBtn, [data-sort]')) { toggleSort(); return; }
   if (e.target.closest('#promoBtn, [data-view="promo"]')) { promoShare(); return; }
   if (e.target.id === 'cancelEventBtn') { cancelEvent(); return; }
-  if (e.target.id === 'editEventBtn') { openEditForm(); return; }
+  if (e.target.closest('#editEventBtn')) { openEditForm(); return; }
   if (e.target.id === 'editSubmit') { submitEditEvent(); return; }
   if (e.target.id === 'cmtSend') { sendComment(); return; }
   const act = e.target.closest('[data-act]');
@@ -319,10 +319,13 @@ async function promoShare() {
   if (!list.length) { alert('目前沒有活動可以宣傳喔～'); return; }
   const lines = list.map((ev) => {
     const cnt = membersOf(ev).length;
-    const t = ev.time || ev.date;
-    return `▶ ${ev.title}\n   📅 ${t}\n   📍 ${ev.place}\n   👥 ${cnt}/${ev.cap} 人`;
+    const date = String(ev.date || '').replace(/-/g, '/');
+    const time = String(ev.time || '').trim();
+    const clock = time.match(/\d{1,2}[:：]\d{2}(?:\s*[-~～至]\s*\d{1,2}[:：]\d{2})?/);
+    const timeText = clock ? clock[0] : (time && !/^\d{1,4}[-/]\d{1,2}/.test(time) ? time : '時間未定');
+    return `▶ ${ev.title}\n   📅 日期：${date}\n   🕒 時間：${timeText}\n   📍 ${ev.place}\n   👥 ${cnt}/${ev.cap} 人`;
   });
-  const header = '🎉 真媽機群組活動佈告欄 ◈ 最新揪團';
+  const header = '🎉 UCCU活動佈告欄 ◈ 最新揪團';
   const footer = '點進佈告欄報名 👇\n' + location.origin + '/';
   const text = header + '\n\n' + lines.join('\n\n') + '\n\n' + footer;
 
